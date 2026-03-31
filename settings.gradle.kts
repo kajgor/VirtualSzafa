@@ -1,11 +1,23 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
 rootProject.name = "VirtualSzafa"
 
+include(":app")
 include(":backend")
 include(":shared:shared-core")
-include(":shared:shared-auth")
 include(":shared:shared-wardrobe")
 include(":shared:shared-outfits")
-include(":shared:shared-marketplace")
-include(":shared:shared-ai")
-include(":shared:shared-analytics")
-include(":shared:shared-sync")
