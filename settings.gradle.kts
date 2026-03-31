@@ -17,7 +17,3 @@ dependencyResolutionManagement {
 rootProject.name = "VirtualSzafa"
 
 include(":app")
-include(":backend")
-include(":shared:shared-core")
-include(":shared:shared-wardrobe")
-include(":shared:shared-outfits")
