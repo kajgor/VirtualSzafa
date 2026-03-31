@@ -1,3 +1,3 @@
 # androidApp
 
-Docelowa aplikacja Android oparta o Jetpack Compose.
+Docelowa aplikacja Android (Jetpack Compose) do dalszej implementacji.

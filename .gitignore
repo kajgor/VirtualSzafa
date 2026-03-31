@@ -1,1 +1,11 @@
-# Git ignore placeholder for VirtualSzafa
+.gradle/
+build/
+**/build/
+.idea/
+*.iml
+.DS_Store
+local.properties
+*.log
+.env
+.env.*
+DerivedData/

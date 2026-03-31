@@ -1,3 +1,3 @@
 # iosApp
 
-Docelowa aplikacja iOS oparta o SwiftUI oraz integrację z modułem Kotlin Multiplatform.
+Docelowa aplikacja iOS (SwiftUI) do dalszej implementacji.

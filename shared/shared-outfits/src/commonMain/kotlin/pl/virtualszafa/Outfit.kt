@@ -1,4 +1,4 @@
-package pl.virtualszafa.backend.model
+package pl.virtualszafa
 
 import kotlinx.serialization.Serializable
 

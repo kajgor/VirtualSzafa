@@ -1,8 +1,6 @@
-# Architektura techniczna
+# Architektura
 
-- Mobile UI: Android / iOS
-- Shared domain: Kotlin Multiplatform
-- Backend API: Ktor
-- DB: PostgreSQL
-- Storage: S3 compatible
-- Integracje: marketplace, AI, billing, import zakupów
+- Backend API: Kotlin + Ktor
+- Shared Domain: Kotlin Multiplatform
+- Mobile: Android / iOS
+- Storage docelowo: PostgreSQL + S3
