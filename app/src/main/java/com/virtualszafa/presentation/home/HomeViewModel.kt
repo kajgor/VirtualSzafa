@@ -1,34 +1,45 @@
 package com.virtualszafa.presentation.home
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.virtualszafa.data.repository.ProductLabelRecognizer
 import com.virtualszafa.data.repository.ScanRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.launch
-import javax.inject.Inject
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val scanRepository: ScanRepository
+    private val scanRepository: ScanRepository,
+    private val labelRecognizer: ProductLabelRecognizer,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
     val scanState = _scanState.asStateFlow()
 
-    // Kanał dla jednorazowych zdarzeń nawigacji
     private val _navigationEvent = Channel<NavigationEvent>()
     val navigationEvent = _navigationEvent.receiveAsFlow()
 
     sealed class NavigationEvent {
-        data class NavigateToAddItem(val barcode: String?, val aiId: String?) : NavigationEvent()
+        data class NavigateToAddItem(
+            val name: String? = null,
+            val brand: String? = null,
+            val size: String? = null,
+            val color: String? = null,
+            val barcode: String? = null,
+            val aiId: String? = null
+        ) : NavigationEvent()
     }
 
     init {
@@ -39,24 +50,45 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Wspólna logika obsługi wyników skanowania (z kamery i z pliku)
-     */
     private fun handleScanResult(result: ScanState) {
         _scanState.value = result
 
         when (result) {
             is ScanState.BarcodeFound -> {
-                scanRepository.stopScan()
-                viewModelScope.launch {
-                    _navigationEvent.send(NavigationEvent.NavigateToAddItem(result.code, null))
+                // Nie zatrzymujemy skanowania (unbindAll) przed zrobieniem zdjęcia,
+                // bo unbindAll wyłączy ImageCapture.
+                scanRepository.capturePhotoAsBitmap(context = context) { bitmap ->
+                    // Teraz możemy zatrzymać skanowanie
+                    scanRepository.stopScan()
+
+                    if (bitmap != null) {
+                        viewModelScope.launch {
+                            try {
+                                val labelResult = labelRecognizer.recognizeLabel(bitmap)
+                                _navigationEvent.send(
+                                    NavigationEvent.NavigateToAddItem(
+                                        name = labelResult.productName,
+                                        brand = labelResult.brand,
+                                        size = labelResult.size,
+                                        color = labelResult.color,
+                                        barcode = result.code
+                                    )
+                                )
+                            } catch (e: Exception) {
+                                _navigationEvent.send(NavigationEvent.NavigateToAddItem(barcode = result.code))
+                            }
+                        }
+                    } else {
+                        viewModelScope.launch {
+                            _navigationEvent.send(NavigationEvent.NavigateToAddItem(barcode = result.code))
+                        }
+                    }
                 }
-                _scanState.value = ScanState.Scanning
             }
             is ScanState.AIProductFound -> {
                 scanRepository.stopScan()
                 viewModelScope.launch {
-                    _navigationEvent.send(NavigationEvent.NavigateToAddItem(null, result.productId))
+                    _navigationEvent.send(NavigationEvent.NavigateToAddItem(aiId = result.productId))
                 }
                 _scanState.value = ScanState.Scanning
             }
@@ -64,9 +96,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Toggle włącz/wyłącz skanowanie kamerą
-     */
     fun toggleCameraScan() {
         val current = _scanState.value
         if (current is ScanState.Scanning) {
@@ -94,10 +123,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Natychmiast wyłącza tryb skanowania kamery
-     * Używane przy powrocie z AddItemScreen i MyWardrobeScreen
-     */
     fun stopScanning() {
         if (_scanState.value is ScanState.Scanning) {
             scanRepository.stopScan()
@@ -105,7 +130,6 @@ class HomeViewModel @Inject constructor(
         _scanState.value = ScanState.Idle
     }
 
-    /** NOWA METODA – gwarantuje czysty stan przy każdym wejściu na HomeScreen */
     fun resetToIdle() {
         if (_scanState.value is ScanState.Scanning) {
             scanRepository.stopScan()

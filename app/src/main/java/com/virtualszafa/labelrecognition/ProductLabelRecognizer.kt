@@ -5,6 +5,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.tasks.await
 import java.util.regex.Pattern
 
@@ -26,7 +27,7 @@ import java.util.regex.Pattern
 class ProductLabelRecognizer {
 
     private val barcodeScanner = BarcodeScanning.getClient()
-    private val textRecognizer: TextRecognizer = TextRecognition.getClient()
+    private val textRecognizer: TextRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     /**
      * Główna funkcja rozpoznawania etykiety z Bitmapy (zdjęcia z kamery/galerii).

@@ -142,13 +142,18 @@ fun HomeScreen(
         viewModel.navigationEvent.collect { event ->
             when (event) {
                 is HomeViewModel.NavigationEvent.NavigateToAddItem -> {
-                    val route = if (event.barcode != null) {
-                        "add_item?barcode=${event.barcode}"
-                    } else {
-                        "add_item?aiId=${event.aiId}"
+                    val route = buildString {
+                        append("add_item?")
+                        val params = mutableListOf<String>()
+                        event.barcode?.let { params.add("barcode=$it") }
+                        event.aiId?.let { params.add("aiId=$it") }
+                        event.name?.let { params.add("name=${Uri.encode(it)}") }
+                        event.brand?.let { params.add("brand=${Uri.encode(it)}") }
+                        event.size?.let { params.add("size=${Uri.encode(it)}") }
+                        event.color?.let { params.add("color=${Uri.encode(it)}") }
+                        append(params.joinToString("&"))
                     }
                     
-                    // Sprawdzamy czy już nie jesteśmy na tym ekranie (dodatkowe zabezpieczenie)
                     if (navController.currentDestination?.route?.startsWith("add_item") != true) {
                         navController.navigate(route)
                     }

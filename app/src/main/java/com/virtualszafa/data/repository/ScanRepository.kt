@@ -1,13 +1,12 @@
 package com.virtualszafa.data.repository
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -17,10 +16,10 @@ import com.google.mlkit.vision.common.InputImage
 import com.virtualszafa.presentation.home.ScanState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import java.io.File
 import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
-import java.io.IOException
 
 @Singleton
 class ScanRepository @Inject constructor() {
@@ -29,13 +28,17 @@ class ScanRepository @Inject constructor() {
     val scanResult: SharedFlow<ScanState> = _scanResult
 
     private var cameraProvider: ProcessCameraProvider? = null
+    private var imageCapture: ImageCapture? = null
+    private var isScanning = false
 
-    // ==================== Z KAMERY – CIĄGŁY LIVE SCANNING ====================
     fun startScan(
         context: Context,
         lifecycleOwner: LifecycleOwner,
-        previewView: androidx.camera.view.PreviewView
+        previewView: PreviewView
     ) {
+        if (isScanning) return
+        isScanning = true
+
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
@@ -56,11 +59,10 @@ class ScanRepository @Inject constructor() {
 
             val scanner = BarcodeScanning.getClient(options)
             var lastBarcodeTime = 0L
-            val barcodeCooldownMs = 800L // Throttle detections: improves performance (less ML calls) and stability (no duplicate nav)
+            val barcodeCooldownMs = 800L
 
             imageAnalyzer.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy: ImageProxy ->
-                @Suppress("ExperimentalGetImage")
-                @OptIn(ExperimentalGetImage::class)
+                @Suppress("DEPRECATION")
                 val mediaImage = imageProxy.image
 
                 if (mediaImage != null) {
@@ -73,13 +75,12 @@ class ScanRepository @Inject constructor() {
                     val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
                     scanner.process(image)
-                        .addOnSuccessListener { barcodes: List<Barcode> ->
+                        .addOnSuccessListener { barcodes ->
                             if (barcodes.isNotEmpty()) {
                                 val code = barcodes.first().rawValue ?: ""
                                 lastBarcodeTime = System.currentTimeMillis()
                                 _scanResult.tryEmit(ScanState.BarcodeFound(code))
                             }
-                            // NIE emitujemy AIProcessing co klatkę – dzięki temu preview jest Ciągły!
                         }
                         .addOnCompleteListener { imageProxy.close() }
                 } else {
@@ -87,18 +88,60 @@ class ScanRepository @Inject constructor() {
                 }
             }
 
+            imageCapture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .build()
+
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                cameraSelector,
-                preview,
-                imageAnalyzer
-            )
+
+            try {
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageAnalyzer,
+                    imageCapture
+                )
+            } catch (e: Exception) {
+                _scanResult.tryEmit(ScanState.Idle)
+            }
         }, ContextCompat.getMainExecutor(context))
     }
 
-    // ==================== Z PLIKU (GALERIA) – bez zmian ====================
+    fun capturePhotoAsBitmap(
+        context: Context,
+        onResult: (Bitmap?) -> Unit
+    ) {
+        val capture = imageCapture ?: run {
+            onResult(null)
+            return
+        }
+
+        val outputFile = File.createTempFile("label_capture_", ".jpg", context.cacheDir)
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(outputFile).build()
+
+        capture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    try {
+                        val bitmap = BitmapFactory.decodeFile(outputFile.absolutePath)
+                        onResult(bitmap)
+                        outputFile.delete()
+                    } catch (e: Exception) {
+                        onResult(null)
+                    }
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    onResult(null)
+                }
+            }
+        )
+    }
+
     fun analyzeImageFromUri(
         context: Context,
         uri: Uri,
@@ -106,15 +149,10 @@ class ScanRepository @Inject constructor() {
     ) {
         try {
             val image = InputImage.fromFilePath(context, uri)
-
-            val options = BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
-                .build()
-
-            val scanner = BarcodeScanning.getClient(options)
+            val scanner = BarcodeScanning.getClient()
 
             scanner.process(image)
-                .addOnSuccessListener { barcodes: List<Barcode> ->
+                .addOnSuccessListener { barcodes ->
                     if (barcodes.isNotEmpty()) {
                         val code = barcodes.first().rawValue ?: ""
                         onResult(ScanState.BarcodeFound(code))
@@ -133,5 +171,7 @@ class ScanRepository @Inject constructor() {
     fun stopScan() {
         cameraProvider?.unbindAll()
         cameraProvider = null
+        imageCapture = null
+        isScanning = false
     }
 }

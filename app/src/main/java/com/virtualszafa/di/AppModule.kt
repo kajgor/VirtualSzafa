@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.virtualszafa.data.local.AppDatabase
 import com.virtualszafa.data.local.ProductDao
 import com.virtualszafa.data.repository.WardrobeRepository
+import com.virtualszafa.labelrecognition.ProductLabelRecognizer
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,5 +39,11 @@ object AppModule {
     @Singleton
     fun provideWardrobeRepository(dao: ProductDao): WardrobeRepository {
         return WardrobeRepository(dao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideProductLabelRecognizer(): ProductLabelRecognizer {
+        return ProductLabelRecognizer()
     }
 }

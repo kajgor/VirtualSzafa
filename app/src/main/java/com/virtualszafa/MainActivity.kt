@@ -34,26 +34,32 @@ fun VirtualSzafaApp() {
 
     NavHost(navController = navController, startDestination = "home") {
         composable("home") { HomeScreen(navController) }
-
-        // Poprawione – przekazujemy navController do MyWardrobeScreen
         composable("my_wardrobe") { MyWardrobeScreen(navController) }
-
         composable("settings") { SettingsScreen(navController) }
 
-        // Pełna integracja AddItemScreen z parametrami
         composable(
-            route = "add_item?barcode={barcode}&aiId={aiId}",
+            route = "add_item?name={name}&brand={brand}&size={size}&color={color}&barcode={barcode}",
             arguments = listOf(
-                navArgument("barcode") { type = NavType.StringType; nullable = true },
-                navArgument("aiId") { type = NavType.StringType; nullable = true }
+                navArgument("name") { type = NavType.StringType; nullable = true },
+                navArgument("brand") { type = NavType.StringType; nullable = true },
+                navArgument("size") { type = NavType.StringType; nullable = true },
+                navArgument("color") { type = NavType.StringType; nullable = true },
+                navArgument("barcode") { type = NavType.StringType; nullable = true }
             )
         ) { backStackEntry ->
+            val name = backStackEntry.arguments?.getString("name")
+            val brand = backStackEntry.arguments?.getString("brand")
+            val size = backStackEntry.arguments?.getString("size")
+            val color = backStackEntry.arguments?.getString("color")
             val barcode = backStackEntry.arguments?.getString("barcode")
-            val aiId = backStackEntry.arguments?.getString("aiId")
+
             AddItemScreen(
                 navController = navController,
-                barcode = barcode,
-                aiId = aiId
+                prefilledName = name,
+                prefilledBrand = brand,
+                prefilledSize = size,
+                prefilledColor = color,
+                barcode = barcode
             )
         }
     }

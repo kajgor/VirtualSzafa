@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.virtualszafa.presentation.home.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -18,17 +17,23 @@ fun AddItemScreen(
     navController: NavController,
     barcode: String? = null,
     aiId: String? = null,
+    prefilledName: String? = null,
+    prefilledBrand: String? = null,
+    prefilledSize: String? = null,
+    prefilledColor: String? = null,
     viewModel: AddItemViewModel = hiltViewModel()
 ) {
-    var name by remember { mutableStateOf(aiId ?: "") }
-    var brand by remember { mutableStateOf("") }
-    var size by remember { mutableStateOf("M") }
+    var name by remember(prefilledName, aiId) { mutableStateOf(prefilledName ?: aiId ?: "") }
+    var brand by remember(prefilledBrand) { mutableStateOf(prefilledBrand ?: "") }
+    var size by remember(prefilledSize) { mutableStateOf(prefilledSize ?: "M") }
+    var color by remember(prefilledColor) { mutableStateOf(prefilledColor ?: "") }
     var notes by remember { mutableStateOf("") }
 
-    // Bezpośredni powrót do poprzedniego ekranu
-    val handleBack: () -> Unit = {
-        navController.popBackStack()
-    }
+    val isRecognized = name.isNotBlank() || brand.isNotBlank() || size.isNotBlank()
+
+    val sizeOptions = listOf("XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL")
+
+    val handleBack: () -> Unit = { navController.popBackStack() }
 
     BackHandler(onBack = handleBack)
 
@@ -38,10 +43,7 @@ fun AddItemScreen(
                 title = { Text("Dodaj do szafy") },
                 navigationIcon = {
                     IconButton(onClick = handleBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Cofnij do skanowania"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cofnij")
                     }
                 }
             )
@@ -54,30 +56,93 @@ fun AddItemScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (!isRecognized) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Produkt nierozpoznany",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            } else {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "✓ Produkt rozpoznany z etykiety",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+
             OutlinedTextField(
-                value = name, onValueChange = { name = it },
-                label = { Text("Nazwa produktu *") }, modifier = Modifier.fillMaxWidth()
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nazwa produktu *") },
+                modifier = Modifier.fillMaxWidth()
             )
+
             OutlinedTextField(
-                value = brand, onValueChange = { brand = it },
-                label = { Text("Marka") }, modifier = Modifier.fillMaxWidth()
+                value = brand,
+                onValueChange = { brand = it },
+                label = { Text("Marka") },
+                modifier = Modifier.fillMaxWidth()
             )
+
+            var expanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = size,
+                    onValueChange = {},
+                    label = { Text("Rozmiar") },
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    sizeOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                size = option
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             OutlinedTextField(
-                value = size, onValueChange = { size = it },
-                label = { Text("Rozmiar") }, modifier = Modifier.fillMaxWidth()
+                value = color,
+                onValueChange = { color = it },
+                label = { Text("Kolor") },
+                modifier = Modifier.fillMaxWidth()
             )
 
             if (!barcode.isNullOrBlank()) {
                 OutlinedTextField(
-                    value = barcode, onValueChange = {},
-                    label = { Text("Kod kreskowy / QR") },
+                    value = barcode,
+                    onValueChange = {},
+                    label = { Text("Kod kreskowy") },
                     enabled = false,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
             OutlinedTextField(
-                value = notes, onValueChange = { notes = it },
+                value = notes,
+                onValueChange = { notes = it },
                 label = { Text("Dodatkowe uwagi") },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 3
@@ -92,9 +157,10 @@ fun AddItemScreen(
                             name = name,
                             brand = brand,
                             size = size,
-                            barcode = barcode
+                            barcode = barcode,
+                            aiRecognizedName = if (isRecognized) "Rozpoznano z etykiety" else null
                         )
-                        handleBack()   // jedno kliknięcie → powrót na kamerę
+                        handleBack()
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
